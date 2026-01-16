@@ -1,0 +1,13 @@
+{
+  "snapshot_id": "synthetic-zone-a",
+  "records": [
+    {"name": "orchard.example", "type": "MX", "value": "0010 MAIL.Orchard.example."},
+    {"name": "orchard.example", "type": "NS", "value": "ns1.provider.example."},
+    {"name": "WWW.Orchard.example.", "type": "a", "value": "192.0.2.10"},
+    {"name": "www.orchard.example", "type": "A", "value": "192.0.2.10"},
+    {"name": "www.orchard.example", "type": "AAAA", "value": "2001:0DB8:0:0:0:0:0:10"},
+    {"name": "files.orchard.example", "type": "CNAME", "value": "WWW.Orchard.example."},
+    {"name": "notorchard.example", "type": "A", "value": "192.0.2.99"},
+    {"name": "orchard.example.invalid", "type": "A", "value": "192.0.2.99"}
+  ]
+}

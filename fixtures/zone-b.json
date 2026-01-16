@@ -1,0 +1,8 @@
+{
+  "snapshot_id": "synthetic-zone-b",
+  "records": [
+    {"name": "www.orchard.example", "type": "AAAA", "value": "2001:db8::10"},
+    {"name": "www.orchard.example", "type": "A", "value": "192.0.2.10"},
+    {"name": "www.orchard.example", "type": "A", "value": "192.0.2.11"}
+  ]
+}

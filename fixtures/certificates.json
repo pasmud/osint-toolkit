@@ -1,0 +1,11 @@
+[
+  {
+    "id": 101,
+    "name_value": "orchard.example\nWWW.Orchard.example.\n*.dev.orchard.example\nbücher.orchard.example\nnotorchard.example\napi.orchard.example.invalid"
+  },
+  {
+    "id": 102,
+    "name_value": "www.orchard.example\nxn--bcher-kva.orchard.example\n*.notorchard.example"
+  },
+  {"id": 101, "name_value": "www.orchard.example"}
+]
