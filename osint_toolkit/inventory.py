@@ -11,6 +11,7 @@ from .names import in_scope, normalize_name
 
 _SNAPSHOT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 _RECORD_TYPES = {"A", "AAAA", "CNAME", "MX", "NS"}
+_MAX_JSON_BYTES = 8 * 1024 * 1024
 
 
 class InputError(ValueError):
@@ -32,10 +33,13 @@ def _reject_constant(_constant):
 
 def _load(path: Path):
     try:
-        with path.open(encoding="utf-8") as stream:
-            return json.load(
-                stream, object_pairs_hook=_unique_object, parse_constant=_reject_constant
-            )
+        with path.open("rb") as stream:
+            content = stream.read(_MAX_JSON_BYTES + 1)
+        if len(content) > _MAX_JSON_BYTES:
+            raise InputError(f"JSON file exceeds the {_MAX_JSON_BYTES}-byte limit")
+        return json.loads(
+            content.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_reject_constant
+        )
     except json.JSONDecodeError as exc:
         raise InputError(f"invalid JSON at line {exc.lineno}, column {exc.colno}") from None
     except UnicodeError:

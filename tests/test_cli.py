@@ -120,6 +120,23 @@ class InputTests(unittest.TestCase):
                 result = run_cli("--domain", "orchard.example", "--ct", str(self.path))
                 self.assert_input_error(result, problem)
 
+    def test_json_file_limit_counts_bytes_and_identifies_input_type(self):
+        limit = 8_388_608
+        for flag, source, content in (
+            ("--ct", "CT", b"[]"),
+            ("--dns", "DNS", '{"snapshot_id":"limit","records":[],"extra":"é"}'.encode()),
+        ):
+            with self.subTest(flag=flag):
+                self.path.write_bytes(content.ljust(limit, b" "))
+                args = ("--domain", "orchard.example", *CT, flag, str(self.path))
+                result = run_cli(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                with self.path.open("ab") as stream:
+                    stream.write(b" ")
+                self.assert_input_error(
+                    run_cli(*args), f"{source} file {str(self.path)!r}: JSON file exceeds the {limit}-byte limit"
+                )
+
     def test_ct_rejects_invalid_rows_without_partial_output(self):
         for data, problem in (
             ({}, "JSON array"),

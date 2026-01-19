@@ -40,7 +40,7 @@ Run `python3 -m osint_toolkit --help` for the complete interface.
 
 ## Input formats
 
-Use UTF-8 JSON files and sanitized exports for your owned domain. Extra fields are not included in the report. Use opaque snapshot IDs and omit personal data from the input.
+Use UTF-8 JSON files and sanitized exports for your owned domain. Each CT or DNS file may be at most 8 MiB (8,388,608 bytes), including whitespace and extra fields. Larger files are rejected before parsing, with the file path and byte limit in the error. Extra fields are not included in the report. Use opaque snapshot IDs and omit personal data from the input.
 
 **CT-style export:** An array of objects. Each requires a nonnegative integer `id` from one consistent certificate ID namespace and a `name_value` string with at least one name. Separate names with LF or CRLF; blank lines and spaces or tabs around lines are ignored. CT wildcard names may use one complete leftmost `*` label.
 
