@@ -1,11 +1,13 @@
 """Load supported exports and merge their observations into an inventory."""
 
+import csv
 import ipaddress
 import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TextIO
 
 from .names import in_scope, normalize_name
 
@@ -198,3 +200,31 @@ def render_text(report: dict) -> str:
             sources = ", ".join(record["snapshot_ids"])
             lines.append(f"  {record['type']} {record['value']} (snapshots: {sources})")
     return "\n".join(lines)
+
+
+def _csv_cell(value: str | int) -> str:
+    text = str(value)
+    # CSV quoting preserves cell boundaries but does not prevent formula evaluation.
+    if text.startswith(("\t", "\r", "\n")) or text.lstrip().startswith(
+        ("=", "+", "-", "@", "＝", "＋", "－", "＠")
+    ):
+        return "'" + text
+    return text
+
+
+def write_csv(report: dict, stream: TextIO) -> None:
+    """Write one spreadsheet-safe CSV row for each certificate or DNS observation."""
+    writer = csv.writer(stream, quoting=csv.QUOTE_ALL, lineterminator="\n")
+    writer.writerow((
+        "domain", "name", "evidence_type", "certificate_id", "record_type", "record_value",
+        "snapshot_id",
+    ))
+    domain = _csv_cell(report["domain"])
+    for item in report["names"]:
+        name = _csv_cell(item["name"])
+        for cert_id in item["certificate_ids"]:
+            writer.writerow((domain, name, "ct", _csv_cell(cert_id), "", "", ""))
+        for record in item["dns_records"]:
+            kind, value = _csv_cell(record["type"]), _csv_cell(record["value"])
+            for snapshot in record["snapshot_ids"]:
+                writer.writerow((domain, name, "dns", "", kind, value, _csv_cell(snapshot)))

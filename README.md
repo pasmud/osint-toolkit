@@ -38,6 +38,17 @@ python3 -m osint_toolkit --domain orchard.example \
 
 Run `python3 -m osint_toolkit --help` for the complete interface.
 
+## CSV evidence export
+
+```sh
+python3 -m osint_toolkit --domain orchard.example \
+  --ct fixtures/certificates.json --dns fixtures/zone-a.json --format csv > evidence.csv
+```
+
+CSV columns are `domain`, `name`, `evidence_type`, `certificate_id`, `record_type`, `record_value`, and `snapshot_id`. Each `ct` row is one distinct name/certificate pair; each `dns` row is one distinct record/snapshot pair. Nonapplicable fields are empty. Rows follow the report's canonical order, with CT before DNS for each name. An empty report contains only the header.
+
+CSV quotes all cells and prefixes an apostrophe to values that could be interpreted as spreadsheet formulas. Import columns as text if the spreadsheet would otherwise coerce identifiers (for example, large certificate IDs); use JSON for exact machine-readable evidence.
+
 ## Input formats
 
 Use UTF-8 JSON files and sanitized exports for your owned domain. Each CT or DNS file may be at most 8 MiB (8,388,608 bytes), including whitespace and extra fields. Larger files are rejected before parsing, with the file path and byte limit in the error. Extra fields are not included in the report. Use opaque snapshot IDs and omit personal data from the input.

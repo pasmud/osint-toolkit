@@ -1,9 +1,13 @@
+import csv
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from osint_toolkit.inventory import write_csv
 
 ROOT = Path(__file__).resolve().parents[1]
 CT = ("--ct", "fixtures/certificates.json")
@@ -16,6 +20,7 @@ def run_cli(*args):
         [sys.executable, "-m", "osint_toolkit", *args],
         cwd=ROOT,
         capture_output=True,
+        check=False,
         encoding="utf-8",
         timeout=5,
     )
@@ -88,6 +93,61 @@ class ReportTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertEqual(result.stdout, "")
                 self.assertIn("error:", result.stderr)
+
+
+class CsvTests(unittest.TestCase):
+    def test_csv_flattens_unique_observations_in_report_order(self):
+        args = ("--domain", "orchard.example", "--format", "csv")
+        first = run_cli(*args, *CT, *ZONE_A, *ZONE_B)
+        second = run_cli(*args, *ZONE_B, *CT, *ZONE_A, *ZONE_B, *CT)
+        for result in (first, second):
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(first.stdout, second.stdout)
+        reader = csv.DictReader(io.StringIO(first.stdout))
+        self.assertEqual(reader.fieldnames, [
+            "domain", "name", "evidence_type", "certificate_id", "record_type", "record_value",
+            "snapshot_id",
+        ])
+        rows = list(reader)
+        self.assertEqual({row["domain"] for row in rows}, {"orchard.example"})
+        self.assertEqual(len(rows), 14)
+        self.assertEqual(rows[0], {
+            "domain": "orchard.example", "name": "*.dev.orchard.example", "evidence_type": "ct",
+            "certificate_id": "101", "record_type": "", "record_value": "", "snapshot_id": "",
+        })
+        www = [row for row in rows if row["name"] == "www.orchard.example"]
+        self.assertEqual([
+            (r["evidence_type"], r["certificate_id"], r["record_type"], r["record_value"], r["snapshot_id"])
+            for r in www
+        ], [
+            ("ct", "101", "", "", ""),
+            ("ct", "102", "", "", ""),
+            ("dns", "", "A", "192.0.2.10", "synthetic-zone-a"),
+            ("dns", "", "A", "192.0.2.10", "synthetic-zone-b"),
+            ("dns", "", "A", "192.0.2.11", "synthetic-zone-b"),
+            ("dns", "", "AAAA", "2001:db8::10", "synthetic-zone-a"),
+            ("dns", "", "AAAA", "2001:db8::10", "synthetic-zone-b"),
+        ])
+
+    def test_csv_empty_report_has_header_only(self):
+        result = run_cli("--domain", "other.example", "--format", "csv", *CT)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(result.stdout.splitlines()), 1)
+        self.assertEqual(next(csv.reader(io.StringIO(result.stdout)))[0], "domain")
+
+    def test_csv_neutralizes_formula_prefixes_and_quotes_delimiters(self):
+        values = ["=", "+", "-", "@", "  =", "\ttext", "\rtext", "\ntext", "＝", 'a,"b"']
+        report = {"domain": "orchard.example", "names": [{
+            "name": "orchard.example", "certificate_ids": [],
+            "dns_records": [{"type": "NS", "value": v, "snapshot_ids": ["synthetic"]} for v in values],
+        }]}
+        stream = io.StringIO(newline="")
+        write_csv(report, stream)
+        rows = list(csv.DictReader(io.StringIO(stream.getvalue(), newline="")))
+        self.assertTrue(all(row["snapshot_id"] == "synthetic" for row in rows))
+        self.assertEqual([row["record_value"] for row in rows], [
+            "'=", "'+", "'-", "'@", "'  =", "'\ttext", "'\rtext", "'\ntext", "'＝", 'a,"b"',
+        ])
 
 
 class InputTests(unittest.TestCase):
