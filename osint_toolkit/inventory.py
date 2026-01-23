@@ -12,7 +12,7 @@ from typing import TextIO
 from .names import in_scope, normalize_name
 
 _SNAPSHOT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
-_RECORD_TYPES = {"A", "AAAA", "CNAME", "MX", "NS"}
+_RECORD_TYPES = {"A", "AAAA", "CNAME", "MX", "NS", "SOA"}
 _MAX_JSON_BYTES = 8 * 1024 * 1024
 
 
@@ -103,6 +103,14 @@ def _record_value(kind: str, value: str) -> str:
         if parts[1] == "." and preference == 0:
             return "0 ."
         return f"{preference} {normalize_name(parts[1])}"
+    if kind == "SOA":
+        parts = re.split(r"[ \t]+", value)
+        if len(parts) != 7 or any(re.fullmatch(r"[0-9]{1,10}", part) is None for part in parts[2:]):
+            raise ValueError("expected two DNS names and five decimal SOA fields")
+        fields = [int(part) for part in parts[2:]]
+        if any(field > 0xFFFFFFFF for field in fields):
+            raise ValueError("SOA fields must fit in unsigned 32 bits")
+        return " ".join([normalize_name(parts[0]), normalize_name(parts[1]), *map(str, fields)])
     return normalize_name(value)
 
 
@@ -121,7 +129,7 @@ def _dns_observations(data):
             raise _invalid(location, "name, type and value must be strings")
         kind = kind.upper() if kind.isascii() else ""
         if kind not in _RECORD_TYPES:
-            raise _invalid(location, "type must be A, AAAA, CNAME, MX or NS")
+            raise _invalid(location, f"type must be one of {', '.join(sorted(_RECORD_TYPES))}")
         try:
             name = normalize_name(owner)
         except ValueError as exc:

@@ -228,6 +228,42 @@ class InputTests(unittest.TestCase):
         result = self.run_with("--dns", {"snapshot_id": "invalid id", "records": []})
         self.assert_input_error(result, "snapshot_id")
 
+    def test_soa_canonicalizes_names_and_uint32_fields_across_snapshots(self):
+        canonical = "xn--bcher-kva.orchard.example hostmaster.orchard.example 4294967295 3600 600 0 300"
+        first = self.path.with_name("soa-a.json")
+        first.write_text(json.dumps({"snapshot_id": "soa-a", "records": [{
+            "name": "ORCHARD.example.", "type": "soa",
+            "value": "BÜCHER.orchard.example.\tHOSTMASTER.Orchard.example. 4294967295 03600 0600 00 0300",
+        }]}), encoding="utf-8")
+        result = self.run_with("--dns", {"snapshot_id": "soa-b", "records": [{
+            "name": "orchard.example", "type": "SOA", "value": canonical,
+        }]}, "--dns", str(first))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["counts"]["dns_records"], 1)
+        self.assertEqual(report["counts"]["dns_observations"], 2)
+        self.assertEqual(report["names"], [{
+            "name": "orchard.example", "certificate_ids": [],
+            "dns_records": [{"type": "SOA", "value": canonical, "snapshot_ids": ["soa-a", "soa-b"]}],
+        }])
+
+    def test_soa_rejects_invalid_presentation(self):
+        for value in (
+            "ns.example hostmaster.example 1 2 3 4",
+            "ns.example hostmaster.example 1 2 3 4 5 6",
+            "ns.example hostmaster.example 4294967296 2 3 4 5",
+            "ns.example hostmaster.example 1 2 3 4 4294967296",
+            "ns.example hostmaster.example 1 2 -3 4 5",
+            "ns.example hostmaster.example 1 ２ 3 4 5",
+            "*.example hostmaster.example 1 2 3 4 5",
+            r"ns.example role\.label.example 1 2 3 4 5",
+        ):
+            with self.subTest(value=value):
+                result = self.run_with("--dns", {"snapshot_id": "soa-invalid", "records": [{
+                    "name": "orchard.example", "type": "SOA", "value": value,
+                }]})
+                self.assert_input_error(result, "DNS record 1: invalid SOA value")
+
     def test_crlf_null_mx_unicode_owner_and_extra_metadata(self):
         certs = self.path.with_name("certs.json")
         certs.write_text(json.dumps([{

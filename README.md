@@ -73,7 +73,11 @@ Use UTF-8 JSON files and sanitized exports for your owned domain. Each CT or DNS
 }
 ```
 
-Supported types are `A`, `AAAA`, `CNAME`, `MX`, and `NS` (case-insensitive). `A` and `AAAA` require an address of the matching family; IPv6 zone identifiers are unsupported. `CNAME` and `NS` take a hostname. `MX` takes a 1–5 digit preference (0–65535) followed by spaces or tabs and a hostname; `0 .` represents null MX. DNS wildcard owners, wildcard record values, service labels such as `_tcp`, TXT records, and other record types are unsupported.
+Supported types are `A`, `AAAA`, `CNAME`, `MX`, `NS`, and `SOA` (case-insensitive). `A` and `AAAA` require an address of the matching family; IPv6 zone identifiers are unsupported. `CNAME` and `NS` take a hostname. `MX` takes a 1–5 digit preference (0–65535) followed by spaces or tabs and a hostname; `0 .` represents null MX.
+
+`SOA` takes `mname rname serial refresh retry expire minimum`, separated by spaces or tabs. Both names use the same hostname syntax as `NS`; use a sanitized role name such as `hostmaster.orchard.example` for the mailbox field (`rname`). Escaped mailbox labels, parentheses, and duration suffixes are unsupported. The five numbers require 1–10 ASCII decimal digits each (0–4294967295); the report removes leading zeros and uses single spaces. Different serials remain distinct evidence; the report does not infer which is newer.
+
+DNS wildcard owners, wildcard record values, service labels such as `_tcp`, TXT records, and other record types are unsupported.
 
 ## Scope and report semantics
 
