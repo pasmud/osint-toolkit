@@ -81,12 +81,14 @@ DNS wildcard owners, wildcard record values, service labels such as `_tcp`, TXT 
 
 ## Scope and report semantics
 
+Use `--subtree dev.orchard.example` with `--domain orchard.example` to report on the subtree root and its descendants. The subtree must be a full name within the owned domain (or the domain itself) and is normalized the same way. Counts reflect only the included evidence; every input row is still validated. Text and JSON identify an explicit subtree separately from the ownership domain. CSV keeps its fixed columns and reports only matching observations; `domain` still identifies the ownership boundary.
+
 - Hostnames normalize to lowercase ASCII: Unicode names are normalized with NFC and Python's standard-library IDNA profile (IDNA 2003), and a single trailing root dot is removed. Valid Unicode and Punycode spellings such as `bücher` and `xn--bcher-kva` merge. Names that would require lossy IDNA mapping (for example, `straße` to `strasse`) are rejected. This is not a full IDNA 2008 or browser URL parser.
 - `orchard.example` matches itself and `www.orchard.example`, but excludes `notorchard.example` and `orchard.example.invalid`. Wildcards are matched by their base and kept as separate patterns: `*.dev.orchard.example` does not add `dev.orchard.example` or any concrete host. DNS records are scoped by owner. A target outside the domain may appear as a value on an in-scope record, but is never promoted to an inventory entry or followed.
 - JSON includes `domain`, `counts`, and `names`; each name has `certificate_ids` and `dns_records`. A certificate observation is a unique name/ID pair. A DNS record is a unique owner/type/canonical value; a DNS observation adds a snapshot ID. Certificate IDs sort numerically; names, record types/values and snapshot IDs sort lexically. The same evidence yields the same report regardless of import order or repeated files.
 - The caller supplies the ownership boundary. Reports do not establish ownership, current DNS state, host availability, certificate validity, or export authenticity. Source IDs are supplied by the exports, not independently verified. Files are loaded in memory; use small local snapshots rather than bulk archives.
 
-Exit `0` means a report was generated, including when no evidence matched. Exit `1` means an input file could not be read or failed parsing or schema validation; no partial report is printed. Errors go to stderr and identify the file and, where applicable, the row or JSON line and column. Validation also applies to out-of-scope rows. Exit `2` means invalid CLI usage or an invalid domain.
+Exit `0` means a report was generated, including when no evidence matched. Exit `1` means an input file could not be read or failed parsing or schema validation; no partial report is printed. Errors go to stderr and identify the file and, where applicable, the row or JSON line and column. Validation also applies to out-of-scope rows. Exit `2` means invalid CLI usage or an invalid domain or subtree.
 
 ## Verification
 

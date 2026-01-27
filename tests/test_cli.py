@@ -94,6 +94,24 @@ class ReportTests(unittest.TestCase):
                 self.assertEqual(result.stdout, "")
                 self.assertIn("error:", result.stderr)
 
+    def test_subtree_rejects_outside_or_invalid_names(self):
+        for subtree in ("other.example", "notorchard.example", "*.orchard.example", "dev"):
+            with self.subTest(subtree=subtree):
+                result = run_cli("--domain", "orchard.example", "--subtree", subtree, *CT)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertIn("invalid --subtree", result.stderr)
+
+    def test_subtree_text_reports_empty_scope(self):
+        result = run_cli("--domain", "orchard.example", "--subtree", "unused.orchard.example", *CT)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            "Domain: orchard.example",
+            "Subtree: unused.orchard.example",
+            "Names: 0 | Certificate observations: 0 | DNS records: 0 | DNS observations: 0",
+            "No matching evidence.",
+        ])
+
 
 class CsvTests(unittest.TestCase):
     def test_csv_flattens_unique_observations_in_report_order(self):
@@ -227,6 +245,31 @@ class InputTests(unittest.TestCase):
     def test_dns_rejects_bad_snapshot_label(self):
         result = self.run_with("--dns", {"snapshot_id": "invalid id", "records": []})
         self.assert_input_error(result, "snapshot_id")
+
+    def test_subtree_counts_only_matching_owners_and_certificate_patterns(self):
+        result = self.run_with("--dns", {"snapshot_id": "subtree-test", "records": [
+            {"name": "dev.orchard.example", "type": "A", "value": "192.0.2.7"},
+            {"name": "app.dev.orchard.example", "type": "CNAME", "value": "elsewhere.example"},
+            {"name": "notdev.orchard.example", "type": "A", "value": "192.0.2.8"},
+            {"name": "orchard.example", "type": "A", "value": "192.0.2.9"},
+        ]}, *CT, "--subtree", "Dev.Orchard.Example.")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["domain"], "orchard.example")
+        self.assertEqual(report["subtree"], "dev.orchard.example")
+        self.assertEqual(report["counts"], {
+            "names": 3, "certificate_observations": 1, "dns_records": 2, "dns_observations": 2,
+        })
+        self.assertEqual([item["name"] for item in report["names"]], [
+            "*.dev.orchard.example", "app.dev.orchard.example", "dev.orchard.example",
+        ])
+        self.assertEqual(report["names"][1]["dns_records"][0]["value"], "elsewhere.example")
+
+    def test_subtree_still_validates_excluded_rows(self):
+        result = self.run_with("--dns", {"snapshot_id": "subtree-test", "records": [
+            {"name": "orchard.example", "type": "A", "value": "2001:db8::1"},
+        ]}, *CT, "--subtree", "dev.orchard.example")
+        self.assert_input_error(result, "DNS record 1: invalid A value")
 
     def test_soa_canonicalizes_names_and_uint32_fields_across_snapshots(self):
         canonical = "xn--bcher-kva.orchard.example hostmaster.orchard.example 4294967295 3600 600 0 300"

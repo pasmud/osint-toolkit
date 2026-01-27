@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
-from .names import in_scope, normalize_name
+from .names import in_scope, normalize_domain, normalize_name
 
 _SNAPSHOT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 _RECORD_TYPES = {"A", "AAAA", "CNAME", "MX", "NS", "SOA"}
@@ -18,6 +18,10 @@ _MAX_JSON_BYTES = 8 * 1024 * 1024
 
 class InputError(ValueError):
     """Invalid or unreadable evidence input."""
+
+
+class ScopeError(ValueError):
+    """Invalid reporting subtree for the owned domain."""
 
 
 def _unique_object(pairs):
@@ -147,20 +151,30 @@ class _Evidence:
     dns_records: dict[tuple[str, str], set[str]] = field(default_factory=dict)
 
 
-def build_report(domain: str, ct_paths: list[Path], dns_paths: list[Path]) -> dict:
-    """Build the report for an already normalized scope, or raise InputError."""
+def build_report(
+    domain: str, ct_paths: list[Path], dns_paths: list[Path], *, subtree: str | None = None
+) -> dict:
+    """Build a report within the normalized ownership domain and optional subtree."""
+    if subtree is not None:
+        try:
+            subtree = normalize_domain(subtree)
+        except ValueError as exc:
+            raise ScopeError(str(exc)) from None
+        if not in_scope(subtree, domain):
+            raise ScopeError("expected the owned domain or one of its subdomains")
+    scope = subtree if subtree is not None else domain
     by_name: dict[str, _Evidence] = defaultdict(_Evidence)
     for path in ct_paths:
         try:
             for name, cert_id in _ct_observations(_load(path)):
-                if in_scope(name, domain):
+                if in_scope(name, scope):
                     by_name[name].certificates.add(cert_id)
         except InputError as exc:
             raise InputError(f"CT file {str(path)!r}: {exc}") from None
     for path in dns_paths:
         try:
             for name, kind, value, snapshot in _dns_observations(_load(path)):
-                if in_scope(name, domain):
+                if in_scope(name, scope):
                     evidence = by_name[name]
                     evidence.dns_records.setdefault((kind, value), set()).add(snapshot)
         except InputError as exc:
@@ -179,6 +193,7 @@ def build_report(domain: str, ct_paths: list[Path], dns_paths: list[Path]) -> di
     ]
     return {
         "domain": domain,
+        **({"subtree": subtree} if subtree is not None else {}),
         "counts": {
             "names": len(names),
             "certificate_observations": sum(len(item["certificate_ids"]) for item in names),
@@ -193,11 +208,13 @@ def build_report(domain: str, ct_paths: list[Path], dns_paths: list[Path]) -> di
 
 def render_text(report: dict) -> str:
     counts = report["counts"]
-    lines = [
-        f"Domain: {report['domain']}",
+    lines = [f"Domain: {report['domain']}"]
+    if "subtree" in report:
+        lines.append(f"Subtree: {report['subtree']}")
+    lines.append(
         f"Names: {counts['names']} | Certificate observations: {counts['certificate_observations']}"
-        f" | DNS records: {counts['dns_records']} | DNS observations: {counts['dns_observations']}",
-    ]
+        f" | DNS records: {counts['dns_records']} | DNS observations: {counts['dns_observations']}"
+    )
     if not report["names"]:
         lines.append("No matching evidence.")
     for item in report["names"]:
