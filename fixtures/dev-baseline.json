@@ -1,0 +1,8 @@
+{
+  "snapshot_id": "dev-baseline",
+  "records": [
+    {"name": "APP.Dev.Orchard.Example.", "type": "a", "value": "192.0.2.20"},
+    {"name": "dev.orchard.example", "type": "SOA", "value": "NS.Example. Hostmaster.Dev.Orchard.Example. 4294967295 03600 600 86400 300"},
+    {"name": "notdev.orchard.example", "type": "A", "value": "192.0.2.90"}
+  ]
+}

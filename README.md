@@ -90,6 +90,25 @@ Use `--subtree dev.orchard.example` with `--domain orchard.example` to report on
 
 Exit `0` means a report was generated, including when no evidence matched. Exit `1` means an input file could not be read or failed parsing or schema validation; no partial report is printed. Errors go to stderr and identify the file and, where applicable, the row or JSON line and column. Validation also applies to out-of-scope rows. Exit `2` means invalid CLI usage or an invalid domain or subtree.
 
+## Offline analyst walkthrough: compare sources
+
+Compare two synthetic exports for the `dev` subtree and keep the source IDs in a spreadsheet-ready evidence table:
+
+```sh
+python3 -m osint_toolkit --domain orchard.example --subtree dev.orchard.example \
+  --ct fixtures/certificates.json \
+  --dns fixtures/dev-baseline.json --dns fixtures/dev-review.json \
+  --format csv > dev-evidence.csv
+```
+
+Filter the six data rows by `record_type` and compare `snapshot_id`:
+
+- Both snapshots reported `192.0.2.20` for `app.dev.orchard.example`; only `dev-review` reported `192.0.2.21` in these files.
+- The two `SOA` rows preserve serial `4294967295` from `dev-baseline` and serial `0` from `dev-review`. Row order is lexical, not chronological; the report does not infer freshness.
+- The `ct` row for `*.dev.orchard.example` is certificate evidence only. It does not corroborate an address or imply the existence of any particular host.
+
+Switch to `--format json` to see the aggregate counts: 3 names, 1 certificate observation, 4 distinct DNS records, and 5 DNS observations. Parent and sibling records do not contribute to these counts.
+
 ## Verification
 
 ```sh

@@ -168,6 +168,36 @@ class CsvTests(unittest.TestCase):
         ])
 
 
+class AnalystWorkflowTests(unittest.TestCase):
+    def test_compare_two_synthetic_snapshots_within_subtree(self):
+        args = (
+            "--domain", "orchard.example", "--subtree", "dev.orchard.example", *CT,
+            "--dns", "fixtures/dev-baseline.json", "--dns", "fixtures/dev-review.json",
+        )
+        summary = run_cli(*args, "--format", "json")
+        self.assertEqual(summary.returncode, 0, summary.stderr)
+        self.assertEqual(json.loads(summary.stdout)["counts"], {
+            "names": 3, "certificate_observations": 1, "dns_records": 4, "dns_observations": 5,
+        })
+
+        export = run_cli(*args, "--format", "csv")
+        self.assertEqual(export.returncode, 0, export.stderr)
+        rows = list(csv.DictReader(io.StringIO(export.stdout)))
+        self.assertEqual([
+            (r["name"], r["evidence_type"], r["certificate_id"], r["record_type"],
+             r["record_value"], r["snapshot_id"]) for r in rows
+        ], [
+            ("*.dev.orchard.example", "ct", "101", "", "", ""),
+            ("app.dev.orchard.example", "dns", "", "A", "192.0.2.20", "dev-baseline"),
+            ("app.dev.orchard.example", "dns", "", "A", "192.0.2.20", "dev-review"),
+            ("app.dev.orchard.example", "dns", "", "A", "192.0.2.21", "dev-review"),
+            ("dev.orchard.example", "dns", "", "SOA",
+             "ns.example hostmaster.dev.orchard.example 0 3600 600 86400 300", "dev-review"),
+            ("dev.orchard.example", "dns", "", "SOA",
+             "ns.example hostmaster.dev.orchard.example 4294967295 3600 600 86400 300", "dev-baseline"),
+        ])
+
+
 class InputTests(unittest.TestCase):
     def setUp(self):
         directory = self.enterContext(tempfile.TemporaryDirectory())

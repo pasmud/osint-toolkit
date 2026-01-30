@@ -1,0 +1,9 @@
+{
+  "snapshot_id": "dev-review",
+  "records": [
+    {"name": "dev.orchard.example.", "type": "soa", "value": "ns.example hostmaster.dev.orchard.example 0 3600 600 86400 300"},
+    {"name": "app.dev.orchard.example", "type": "A", "value": "192.0.2.21"},
+    {"name": "app.dev.orchard.example", "type": "A", "value": "192.0.2.20"},
+    {"name": "orchard.example", "type": "A", "value": "192.0.2.91"}
+  ]
+}
